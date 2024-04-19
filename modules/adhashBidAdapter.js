@@ -7,6 +7,7 @@ const VERSION = '3.6';
 const BAD_WORD_STEP = 0.1;
 const BAD_WORD_MIN = 0.2;
 const ADHASH_BIDDER_CODE = 'adhash';
+const storage = getStorageManager({ bidderCode: ADHASH_BIDDER_CODE });
 
 /**
  * Function that checks the page where the ads are being served for brand safety.
@@ -171,7 +172,6 @@ export const spec = {
   },
 
   buildRequests: (validBidRequests, bidderRequest) => {
-    const storage = getStorageManager({ bidderCode: ADHASH_BIDDER_CODE });
     const { gdprConsent } = bidderRequest;
     const bidRequests = [];
     const body = document.body;
@@ -261,6 +261,19 @@ export const spec = {
       !brandSafety(responseBody.badWords, responseBody.maxScore)
     ) {
       return [];
+    }
+
+    if (storage.localStorageIsEnabled()) {
+      const prefix = request.bidRequest.params.prefix || 'adHash';
+      recentAds = JSON.parse(storage.getDataFromLocalStorage(prefix + 'recentAds') || '[]');
+      recentAds.push([
+        (new Date().getTime() / 1000) | 0,
+        responseBody.creatives[0].advertiserId,
+        responseBody.creatives[0].budgetId,
+        responseBody.creatives[0].expectedHashes.length ? responseBody.creatives[0].expectedHashes[0] : '',
+      ]);
+      var recentAdsFinal = JSON.stringify(recentAds.slice(-100));
+      storage.setDataInLocalStorage(prefix + "recentAds", recentAdsFinal);
     }
 
     const publisherURL = JSON.stringify(request.bidRequest.params.platformURL);
